@@ -46,7 +46,8 @@ def register():
         if cursor.rowcount == 1:
             st.success("Usuario registrado correctamente")
             st.session_state["username"] = nombre
-            st.rerun()  # Recargar la página para limpiar el contenido
+            st.rerun()
+            dashboard()
         else:
             st.error("No se pudo registrar el usuario")
 
@@ -60,13 +61,16 @@ def dashboard():
 def main():
     st.sidebar.title("Menu")
     if "username" in st.session_state:
-        if st.sidebar.button("Dashboard"):
-            dashboard()
+        menu_option = st.sidebar.selectbox("Selecciona una opción", ["Dashboard"])
     else:
-        if st.sidebar.button("Login"):
-            login()
-        if st.sidebar.button("Registro"):
-            register()
+        menu_option = st.sidebar.selectbox("Selecciona una aplicación", ["Iniciar sesión", "Registro"])
+
+    if menu_option == "Dashboard" and "username" in st.session_state:
+        dashboard()
+    elif menu_option == "Iniciar sesión":
+        login()
+    elif menu_option == "Registro":
+        register()
 
 if __name__ == "__main__":
     main()
