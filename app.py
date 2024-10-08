@@ -2,7 +2,10 @@ import streamlit as st
 import mysql.connector as mysql
 import uuid
 from streamlit_calendar import calendar
-from io import BytesIO
+import smtplib
+from email.message import EmailMessage
+import ssl # Importar SSL para el envío de correos
+
 # Conectar a la base de datos
 conexion = mysql.connect(
     host="localhost",
@@ -53,6 +56,24 @@ def register():
             dashboard()
         else:
             st.error("No se pudo registrar el usuario")
+            
+def enviar_email(remitente, destinatario, asunto, cuerpo, contraseña):
+    # Crear el objeto del mensaje
+    mensaje = EmailMessage()
+    mensaje['Subject'] = asunto
+    mensaje['From'] = remitente
+    mensaje['To'] = destinatario
+    mensaje.set_content(cuerpo)
+
+    # Conectar al servidor SMTP de Gmail
+    contexto = ssl.create_default_context()
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465, context=contexto) as servidor:
+            servidor.login(remitente, contraseña)
+            servidor.send_message(mensaje)
+        st.info("Correo enviado exitosamente")
+    except Exception as e:
+        st.error(f"Error al enviar el correo: {e}")
 def solicitudes(id):
     st.title("Solicitudes")
     cursor.execute("SELECT * FROM postulaciones WHERE vacante_id = %s", (id,))
@@ -174,6 +195,35 @@ def ver_entrevistas():
     # Mostrando el calendario
     st.write(calendar(events=eventos))
 
+def configurarEmail():
+    st.title("Configurar E-mail")
+    st.info("Esta información se solicita para poder automatizar el envío de E-mails a postulares.\n\nRecomendación: Deberias utilizar un correo profesional exclusivo para el envío de E-mails automatizado.\n\n\nDebes configurar una contraseña de aplicaci;ón para tu correo.")
+    email = st.text_input("Dirección de correo")
+    password = st.text_input("Contraseña del correo", type="password")
+    
+    if st.button("Guardar"):
+        if email and password:
+            try:
+                # Bro, este verifica si las columnas existen en caso que no, las crea.
+                cursor.execute("SHOW COLUMNS FROM users LIKE 'email_correo'")
+                result = cursor.fetchone()
+                if not result:
+                    cursor.execute("ALTER TABLE users ADD COLUMN email_correo VARCHAR(255)")
+                
+                cursor.execute("SHOW COLUMNS FROM users LIKE 'password_correo'")
+                result = cursor.fetchone()
+                if not result:
+                    cursor.execute("ALTER TABLE users ADD COLUMN password_correo VARCHAR(255)")
+                
+                # Aqui se actualizar la información en la base de datos.
+                userid = st.session_state["userid"]
+                cursor.execute("UPDATE users SET email_correo=%s, password_correo=%s WHERE id=%s", (email, password, userid))
+                conexion.commit()
+                st.success("Configuración guardada exitosamente.")
+            except mysql.connector.Error as err:
+                st.error(f"Error: {err}")
+        else:
+            st.warning("Por favor, completa todos los campos.")
 
 def entrevistas():
     st.title("Agendar Entrevistas")
@@ -214,6 +264,37 @@ def entrevistas():
             conexion.commit()
             if cursor.rowcount == 1:
                 st.success("Entrevista agendada correctamente")
+                cursor.execute("SELECT * FROM users WHERE id = %s", (userid,))
+                user = cursor.fetchone()
+                cursor.execute("SELECt * FROM postulaciones WHERE id = %s", (postulacion_id,))
+                postulacion = cursor.fetchone()
+                destinatario = postulacion[3]
+                remitente = user[5]
+                password = user[6]
+                asunto = f"Confirmación de Entrevista para el Puesto de {vacantes_select}"
+                cuerpo = f"""
+                Estimado/a {postulaciones_select},
+
+                Espero que este mensaje le encuentre bien.
+
+                Nos complace informarle que hemos revisado su solicitud para el puesto de {vacantes_select} y nos gustaría invitarle a una entrevista para discutir su candidatura con más detalle.
+
+                Detalles de la entrevista:
+
+                Fecha: {fecha}
+                Por favor, confirme su disponibilidad respondiendo a este correo a la mayor brevedad posible. Si tiene alguna pregunta o necesita reprogramar la entrevista, no dude en comunicarse con nosotros.
+
+                Agradecemos su interés en formar parte de nuestro equipo y esperamos conocerle pronto.
+
+                Atentamente,
+
+                {user[1]}
+                En caso de querer contactarnos, puede hacerlo a:
+                {user[3]}
+                {user[5]}
+                """
+                enviar_email(remitente, destinatario, asunto, cuerpo, password)
+
             else:
                 st.error("No se pudo agendar la entrevista")
 
@@ -227,7 +308,7 @@ def dashboard():
 def main():
     st.sidebar.title("Menu")
     if "username" in st.session_state:
-        menu_option = st.sidebar.selectbox("Selecciona una opción", ["Dashboard", "Vacantes","Entrevistas"])
+        menu_option = st.sidebar.selectbox("Selecciona una opción", ["Dashboard", "Vacantes","Entrevistas","Configurar E-mail"])
     else:
         menu_option = st.sidebar.selectbox("Selecciona una aplicación", ["Iniciar sesión", "Registro"])
 
@@ -241,6 +322,8 @@ def main():
         register()
     elif menu_option == "Entrevistas":
         entrevistas()
+    elif menu_option == "Configurar E-mail":
+        configurarEmail()
 
 
 if __name__ == "__main__":
