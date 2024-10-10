@@ -1,7 +1,5 @@
 streamlit
 mysql.connector
-uuid
 streamlit_calendar
 email.message
 ssl
-json
