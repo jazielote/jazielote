@@ -100,7 +100,11 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `nombre`, `email`, `telefono`, `contrasena`, `email_correo`, `password_correo`) VALUES
+<<<<<<< HEAD
 (0x37343961323330382d613333362d3430, 'Nelvin', 'admin@admin.com', '04247537350', '12345678', NULL, NULL),
+=======
+(0x37343961323330382d613333362d3430, 'Nelvin', 'admin@admin.com', '04247537350', '12345678', NULL, 'No lo voy a dejar aqui por obvias razones'),
+>>>>>>> f81498f4aa327eb3d23e7b5a6d4b9b2a979814be
 (0x64613938663935642d313934392d3437, 'Nelvin', 'njmarquezm@gmail.com', '04247537350', '12345678', 'njmarquezm@gmail.com', 'No lo voy a dejar aqui por obvias razones');
 
 -- --------------------------------------------------------
