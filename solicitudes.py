@@ -1,6 +1,7 @@
 import streamlit as st
 import mysql.connector as mysql
 import uuid
+import json
 import os
 
 # Inicializar el estado de la sesión para el formulario de postulación
@@ -23,6 +24,25 @@ except mysql.Error as err:
 # Obtener el id de la vacante mediante el método GET
 vacante_id = st.query_params.get("vacante_id", [None])
 
+cursor.execute("SELECT * FROM pruebas WHERE vacante_id = %s", (vacante_id,))
+prueba = cursor.fetchall()
+prueba = json.loads(prueba[0][1])
+
+# Función para mostrar la prueba y guardar las respuestas
+def mostrar_prueba(prueba):
+    if isinstance(prueba, dict) and "preguntas" in prueba and isinstance(prueba["preguntas"], list):
+        respuestas = {}
+        for i, item in enumerate(prueba["preguntas"]):
+            respuesta = st.radio(item["pregunta"], item["opciones"], key=f"pregunta_{i}")
+            respuestas[item["pregunta"]] = respuesta
+        enviar = st.selectbox("Enviar", ["No", "Si"])
+        if enviar == "Si":
+            respuestas = json.dumps(respuestas)
+            return respuestas
+    else:
+        st.error("El formato de la prueba no es correcto. Asegúrate de que 'prueba' sea un diccionario con una lista de preguntas.")
+
+
 # Si no se ha proporcionado un id de vacante, mostrar un error y salir
 if not vacante_id:
     st.error("No se ha proporcionado un ID de vacante")
@@ -31,8 +51,8 @@ if not vacante_id:
 # Si se ha proporcionado un id de vacante, mostrar la solicitud de postulación
 else:
     # Consulta para obtener la vacante
-    query = "SELECT * FROM vacantes WHERE id = %s"
-    cursor.execute(query, (vacante_id,))
+    query = f"SELECT * FROM vacantes WHERE id = '{vacante_id}'"
+    cursor.execute(f"{query}")
     vacante = cursor.fetchone()
 
     if vacante:
@@ -60,7 +80,12 @@ else:
                 email = st.text_input("Email")
                 telefono = st.text_input("Teléfono")
                 cv = st.file_uploader("Subir CV", type=["pdf", "docx"])
+                if prueba == None:
+                    pass
+                else:
+                    resultado = mostrar_prueba(prueba)
                 submit_button = st.form_submit_button(label="Postularme")
+
 
                 if submit_button:
                     # Verificar que todos los campos están llenos
@@ -80,11 +105,11 @@ else:
 
                         # Insertar la dirección del archivo en la base de datos
                         query = """
-                        INSERT INTO postulaciones (id, vacante_id, nombre, email, telefono, cv)
-                        VALUES (%s, %s, %s, %s, %s, %s)
+                        INSERT INTO postulaciones (id, vacante_id, nombre, email, telefono, cv, respuestas)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
                         """
                         Uuid = str(uuid.uuid4())
-                        values = (Uuid, vacante_id, nombre, email, telefono, file_path)
+                        values = (Uuid, vacante_id, nombre, email, telefono, file_path, resultado)
                         cursor.execute(query, values)
                         conexion.commit()
 
@@ -106,7 +131,3 @@ else:
             st.info("No se encontraron solicitudes para esta vacante.")
     else:
         st.error("No se encontró la vacante.")
-
-# Cerrar la conexión a la base de datos
-cursor.close()
-conexion.close()
